@@ -34,7 +34,7 @@ public class Constants {
         g = setg;
     }
 
-    //Ces valeurs sont données par le prof
+    //Given values
     public Constants(){
         //System.out.println("creation des constantes:");
         setQ(BigInteger.valueOf(7).add(BigInteger.valueOf(2).pow(160)));

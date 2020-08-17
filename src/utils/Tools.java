@@ -16,17 +16,17 @@ import java.util.Random;
 //fonctions "générales"
 public class Tools {
 
-    //entree: longueur de l'entier en bits
-    //sortie: BigInt généré aléatoirement
+    //in : integer 'lenth'
+    //out: Random BigInteger, with bit lenth = 'lenth'
     public static BigInteger bigRandGen(int lenth){
         Random rnd = new Random();
         BigInteger n = new BigInteger(lenth,rnd);
         return n;
     }
 
-    //Stocker la liste de signature obtenue
+    //write Signatures from ArrayList in a file
+    //Version 1: object format
     public static void saveSign(ArrayList<Signature> currentSign, String fileOutName){
-        BigInteger zero = BigInteger.valueOf(0);
         try(FileOutputStream fileOut = new FileOutputStream(fileOutName);
             ObjectOutputStream buffer = new ObjectOutputStream(fileOut)) //ce mode de déclaration permet de close() automatiquement
         {
@@ -36,7 +36,24 @@ public class Tools {
         }
     }
 
-    //generateur de cle cf appendice B1 page 47
+    //Version 2: String Format (R1|S1|R2 ... |Sn)
+    public static void saveSign2(ArrayList<Signature> currentSign, String fileOutName){
+        try (FileWriter fileOut = new FileWriter(fileOutName);
+             BufferedWriter bufferLine = new BufferedWriter(fileOut)){
+            String line = null;
+            for(Signature sign:currentSign){
+                line = sign.getR().toString();
+                line = line.concat("-");
+                line = line.concat(sign.getS().toString());
+                line = line.concat("@");
+                bufferLine.write(line);
+            }
+        }catch (IOException e){
+            e.printStackTrace();
+        }
+    }
+
+    //Key Generation (see B1 page 47)
     //TODO fct qui vérifie si le couple (L,N) est un couple du standard cf. section 4.2
     //TODO gestion des erreurs
     public static Keys keysGen(BigInteger p, BigInteger q, BigInteger g) {
@@ -62,10 +79,10 @@ public class Tools {
         return currentSecret;
     }
 
-    //Signer les messages issues d'un fichier (norme : une ligne = 1 message)
-    //in: file name
+    //Sign messages from a file (Supposing every line is a message)
+    //in: file name, Keys, Constants and
     //out: arrayList with all signatures
-    public static ArrayList signMessage(String sourcename, Keys currentKeys, Constants currentConstants, SecretNumber currentSecretNum){
+    public static ArrayList signMessage(String sourcename, Keys currentKeys, Constants currentConstants){
         ArrayList<Signature>  signatureList = new ArrayList<Signature>();
 
         try (FileReader reader = new FileReader(sourcename);
@@ -75,7 +92,7 @@ public class Tools {
 
                 //BigInteger hashline = hashComputing("sha-1",line);
                 BigInteger hashline = hashComputing("MD5",line);
-                currentSecretNum = secretNumGen(currentConstants.getP(),currentConstants.getQ());
+                SecretNumber currentSecretNum = secretNumGen(currentConstants.getP(),currentConstants.getQ());
                 signatureList.add(dsaSignature(hashline,currentKeys,currentConstants,currentSecretNum));
             }
 
@@ -86,10 +103,10 @@ public class Tools {
         return signatureList;
     }
 
-    //Calculer valeur de hashage
-    //in: - nom de la méthode de hashage (Str)
-    // - Message (Str)
-    //out: hash sous forme d'un BigInt
+    //Compute hash from
+    //in: - Name of an hash algorithm
+    // - message to hash
+    //out: hash (BigInteger)
     public static BigInteger hashComputing(String algo, String message){
         byte[] digest = null;
         try {
@@ -116,12 +133,10 @@ public class Tools {
             currentSignature.setR((currentConstants.getG().modPow(currentSecret.getSecretNum(), currentConstants.getP())).mod(currentConstants.getQ()));
         }
         else{
-            System.out.println("puissance nulle.");
+            System.out.println("Null power.");
             System.exit(42);
         }
 
-        //N est la longueur de q (en bits)
-        //bitLength OU bitCount ???
         int M = currentHash.bitLength();
         int N = currentConstants.getQ().bitLength(); // il n'y a pas besoin de currentConstantsidérer le min comme dans la doc (?)
 
@@ -131,18 +146,38 @@ public class Tools {
         return currentSignature;
     }
 
-    //lecture des signatures
+    //Read signatures
+    //Version 1: file contain ArrayList<Signature>
     public static ArrayList<Signature> readSignatures(String fileName) {
         ArrayList<Signature> sign= new ArrayList<Signature>();
         try(FileInputStream file = new FileInputStream(fileName);
             ObjectInputStream obj = new ObjectInputStream(file)){// No buffer is required because ObjectInputStream is automaticaly buffered.
-
             sign = (ArrayList<Signature>) obj.readObject();
         }
         catch(IOException | ClassNotFoundException e){
            e.printStackTrace();
         }
         return sign;
+    }
+
+    //Version 2: file contain Signatures
+    public static ArrayList<Signature> readSignaturesString(String fileName){
+        ArrayList<Signature> signList = new ArrayList<Signature>();
+        try (FileReader file = new FileReader(fileName);
+             BufferedReader line = new BufferedReader(file)){
+            String str = line.readLine();
+            String split[] = str.split("@");
+            for(String s:split){
+                Signature sign = new Signature();
+                String split2[] = s.split("-");
+                sign.setR(new BigInteger(split2[0]));
+                sign.setS(new BigInteger(split2[1]));
+                signList.add(sign);
+            }
+        }catch (IOException e){
+            e.printStackTrace();
+        }
+        return signList;
     }
 
     //signature verification
@@ -152,7 +187,7 @@ public class Tools {
             && sign2Check.getS().compareTo(BigInteger.valueOf(0)) == 1 && sign2Check.getS().compareTo(currentConstants.getQ()) == -1 ){
             //vars compute
             int M = hash.bitLength();
-            int N = currentConstants.getQ().bitLength(); // il n'y a pas besoin de currentConstantsidérer le min comme dans la doc (?)
+            int N = currentConstants.getQ().bitLength();
             BigInteger w = sign2Check.getS().modInverse(currentConstants.getQ());
             BigInteger z = hash.shiftRight(Math.max(0,M-N));
             BigInteger u1 = (z.multiply(w)).mod(currentConstants.getQ());
@@ -173,14 +208,14 @@ public class Tools {
         try(FileReader receiveMessages = new FileReader(messageFileName);
             BufferedReader buffer = new BufferedReader(receiveMessages)){
             String line;
-            ArrayList<Signature> signList = readSignatures(signFileName);
-            int i = 0; //Je pense que c'est un peu merdique de faire ca comme ca
+
+            ArrayList<Signature> signList = readSignaturesString(signFileName);
+            int i = 0; //FIXME Maybe there is a better way
             while ((line = buffer.readLine()) != null){
-                //System.out.println(line);
                 BigInteger hashline = hashComputing("MD5",line);
                 if(signVerification(currentKeys, hashline, signList.get(i), currentConstants) == false){
-                    System.out.println("signature fausse.");
-                    throw new SignatureException("L'une des signatures est fausse."); //comment afficher exception ?
+                    System.out.println("Wrong Signature");
+                    throw new SignatureException("One of the signature is wrong"); //How print an exeption ?
                 }
                 i++;
             }
@@ -192,10 +227,11 @@ public class Tools {
     //1000 signatures
     //out: give the time to compute N signatures from the same message
     //unit : nanosecond
-    public static long manySignatures(int N, String toSign, Keys currentKeys, Constants currentConstants, SecretNumber currentSecret){
-        BigInteger hash = hashComputing("sha-1",toSign); //le calcul du hash doit il faire partie du temps de calcul ?
+    public static long manySignatures(int N, String toSign, Keys currentKeys, Constants currentConstants){
         long start = System.nanoTime();
         for(int i = 0; i<N; i++){
+            BigInteger hash = hashComputing("MD5",toSign);
+            SecretNumber currentSecret = secretNumGen(currentConstants.getP(),currentConstants.getQ());
             dsaSignature(hash,currentKeys,currentConstants,currentSecret);
         }
         long end = System.nanoTime();

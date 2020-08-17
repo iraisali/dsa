@@ -16,17 +16,10 @@ public class Main {
         //déclaration + initialisation des vars
         Constants currentConstant = new Constants();
         Keys currentKeys = keysGen(currentConstant.getP(),currentConstant.getQ(),currentConstant.getG());
-        SecretNumber currentSecreetNum = secretNumGen(currentConstant.getP(),currentConstant.getQ());
 
-        //System.out.println(currentSecreetNum.getSecretNum());
-        //System.out.println(currentSecreetNum.getInvSecret());
-        //System.out.println(currentSign.getS());
+        ArrayList signatureList = signMessage("alice",currentKeys,currentConstant);
 
-        ArrayList signatureList = signMessage("alice",currentKeys,currentConstant,currentSecreetNum);
-
-
-        saveSign(signatureList,"output");
-        ArrayList<Signature> signVerif = readSignatures("output");
+        saveSign2(signatureList,"output");
 
         try{
             signsFromFileVerification("output","alice",currentKeys,currentConstant);
@@ -35,7 +28,8 @@ public class Main {
             System.out.println("erreur.");
         }
         int n = 10000;
-        long N = manySignatures(n,"bonjour, comment ca va?",currentKeys,currentConstant,currentSecreetNum);
+        SecretNumber currentSecreetNum = secretNumGen(currentConstant.getP(),currentConstant.getQ());
+        long N = manySignatures(n,"bonjour, comment ca va?",currentKeys,currentConstant);
         System.out.println("Le temps de calcul de "+n+" signatures est de "+N+" nanosecondes.");
     }
 }

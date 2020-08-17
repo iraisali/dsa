@@ -26,14 +26,6 @@ public class Keys {
         this.pubkey = pubkey;
     }
 
-    /*public BigInteger getTmpkey() {
-        return tmpkey;
-    }*/
-
-    /*public void setTmpkey(BigInteger tmpkey) {
-        this.tmpkey = tmpkey;
-    }*/
-
 
     //TODO constructor ? la j'ai une méthode dans Tools mais j'sais meme pas quoi en faire ..
     public Keys() {
