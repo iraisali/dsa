@@ -10,6 +10,13 @@ public class Constants {
     private BigInteger q;
     private BigInteger g;
 
+    public static String separator = " | ";
+    //public static String inputMessageFile = "alice";
+    public static String outputSignatureFile = "output_signatures";
+    public static String errorSignatureFile = "errors_signatures";
+    public static String outputPublicKeyFile = "public_key";
+
+
     public BigInteger getP() {
         return p;
     }
@@ -45,11 +52,4 @@ public class Constants {
         setG(BigInteger.valueOf(2).modPow(r, p));
     }
 
-    /*public Constants(int n){
-        if(n == 0) {
-            setQ(BigInteger.valueOf(13));
-            setP(BigInteger.valueOf(53));
-            setG(BigInteger.valueOf(2));
-        }
-    }*/
 }

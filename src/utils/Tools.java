@@ -4,7 +4,7 @@ import fr.irmar.Keys;
 import fr.irmar.SecretNumber;
 import fr.irmar.Signature;
 import fr.irmar.SignatureException;
-import org.jetbrains.annotations.NotNull;
+import service.WriteService;
 
 import java.io.*;
 import java.math.BigInteger;
@@ -13,7 +13,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Random;
 
-//fonctions "générales"
 public class Tools {
 
     //in : integer 'lenth'
@@ -38,17 +37,27 @@ public class Tools {
 
     //Version 2: String Format (R1|S1|R2 ... |Sn)
     public static void saveSign2(ArrayList<Signature> currentSign, String fileOutName){
-        try (FileWriter fileOut = new FileWriter(fileOutName);
-             BufferedWriter bufferLine = new BufferedWriter(fileOut)){
+
+        WriteService.saveSignatureInFile(currentSign,fileOutName);
+
+    }
+
+    //Version 3: 2 separates files.
+    public static void saveSign3(ArrayList<Signature> currentSign, String fileOutName1, String fileOutName2){
+        try(FileWriter fileOut = new FileWriter(fileOutName1);
+            FileWriter fileOut2 = new FileWriter(fileOutName2);
+            BufferedWriter bufferLineR = new BufferedWriter(fileOut);
+            BufferedWriter bufferLineS = new BufferedWriter(fileOut2)) {
             String line = null;
             for(Signature sign:currentSign){
                 line = sign.getR().toString();
                 line = line.concat("-");
-                line = line.concat(sign.getS().toString());
-                line = line.concat("@");
-                bufferLine.write(line);
+                bufferLineR.write(line);
+                line = sign.getS().toString();
+                line = line.concat("-");
+                bufferLineS.write(line);
             }
-        }catch (IOException e){
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
@@ -65,6 +74,20 @@ public class Tools {
         K.setPrivkey((c.mod(q.add(BigInteger.valueOf(-1)))).add(BigInteger.valueOf(1)));
         K.setPubkey(g.modPow(K.getPrivkey(), p));
         return K;
+    }
+
+    //take public key from a file
+    public static Keys keyFromFile(String keyFileName){
+        Keys currentKeys = new Keys();
+        try(FileReader file = new FileReader(keyFileName);
+            BufferedReader buffer = new BufferedReader(file)) {
+
+            currentKeys.setPubkey(new BigInteger(buffer.readLine()));
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return currentKeys;
     }
 
     //Secret Number generator (for each message)
@@ -147,34 +170,51 @@ public class Tools {
     }
 
     //Read signatures
-    //Version 1: file contain ArrayList<Signature>
-    public static ArrayList<Signature> readSignatures(String fileName) {
-        ArrayList<Signature> sign= new ArrayList<Signature>();
-        try(FileInputStream file = new FileInputStream(fileName);
-            ObjectInputStream obj = new ObjectInputStream(file)){// No buffer is required because ObjectInputStream is automaticaly buffered.
-            sign = (ArrayList<Signature>) obj.readObject();
-        }
-        catch(IOException | ClassNotFoundException e){
-           e.printStackTrace();
-        }
-        return sign;
-    }
-
-    //Version 2: file contain Signatures
+    //Version 1: file contain Signatures
     public static ArrayList<Signature> readSignaturesString(String fileName){
         ArrayList<Signature> signList = new ArrayList<Signature>();
         try (FileReader file = new FileReader(fileName);
-             BufferedReader line = new BufferedReader(file)){
-            String str = line.readLine();
-            String split[] = str.split("@");
-            for(String s:split){
+
+             BufferedReader buffer = new BufferedReader(file)){
+
+            String line;
+
+            while((line = buffer.readLine()) != null){
                 Signature sign = new Signature();
-                String split2[] = s.split("-");
-                sign.setR(new BigInteger(split2[0]));
-                sign.setS(new BigInteger(split2[1]));
+                String splitSignature[] = line.split(Constants.separator);
+
+                //format : R | S
+                sign.setR(new BigInteger(splitSignature[0]));
+                sign.setS(new BigInteger(splitSignature[2]));
                 signList.add(sign);
             }
         }catch (IOException e){
+            e.printStackTrace();
+        }
+        return signList;
+    }
+
+    //Version 3: Signatures from 2 files
+    public static ArrayList<Signature> readSignaturesString2(String fileNameR, String fileNameS){
+        ArrayList<Signature> signList = new ArrayList<Signature>();
+        try(FileReader fileR = new FileReader(fileNameR);
+            BufferedReader lineR = new BufferedReader(fileR);
+            FileReader fileS = new FileReader(fileNameS);
+            BufferedReader lineS = new BufferedReader(fileS)) {
+            String strR = lineR.readLine();
+            String strS = lineS.readLine();
+            String splitR[] = strR.split("-");
+            String splitS[] = strS.split("-");
+            int N = splitR.length;
+            for(int i = 0; i<N; i++){
+                Signature sign = new Signature();
+                sign.setR(new BigInteger(splitR[i]));
+                sign.setS(new BigInteger(splitS[i]));
+                signList.add(sign);
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
             e.printStackTrace();
         }
         return signList;
@@ -195,7 +235,7 @@ public class Tools {
             BigInteger v = (((currentConstants.getG().modPow(u1,currentConstants.getP())).multiply(currentKeys.getPubkey().modPow(u2,currentConstants.getP()))).mod(currentConstants.getP())).mod(currentConstants.getQ());
             //second test
             if(v.compareTo(sign2Check.getR()) == 0){
-                System.out.println("Right signature !");
+                //System.out.println("Right signature !");
                 return true;
             }
         }
@@ -206,11 +246,40 @@ public class Tools {
     //signatures from file verification
     public static void signsFromFileVerification(String signFileName, String messageFileName, Keys currentKeys, Constants currentConstants) throws SignatureException {
         try(FileReader receiveMessages = new FileReader(messageFileName);
+
+            BufferedReader buffer = new BufferedReader(receiveMessages)){
+
+            ArrayList<Integer> errorsLine = new ArrayList<Integer>();
+            String line;
+            ArrayList<Signature> signList = readSignaturesString(signFileName);
+            int i = 0;
+            while ((line = buffer.readLine()) != null){
+                BigInteger hashline = hashComputing("MD5",line);
+                if(signVerification(currentKeys, hashline, signList.get(i), currentConstants) == false){
+                    errorsLine.add(i+1);
+                }
+                i++;
+            }
+
+            //write signature error's line in a file:
+            if(errorsLine != null && errorsLine.size()>0) {
+                WriteService.writeErrorSignatureLine(errorsLine);
+            }
+            else{
+                System.out.println("All messages are well-signed!");
+            }
+        }catch (IOException e){
+            e.printStackTrace();
+        }
+    }
+
+    //signatures from 2 files
+    public static void signsFromTwoFilesVerification(String signFileNameR, String signFileNameS, String messageFileName, Keys currentKeys, Constants currentConstants) throws SignatureException {
+        try(FileReader receiveMessages = new FileReader(messageFileName);
             BufferedReader buffer = new BufferedReader(receiveMessages)){
             String line;
-
-            ArrayList<Signature> signList = readSignaturesString(signFileName);
-            int i = 0; //FIXME Maybe there is a better way
+            ArrayList<Signature> signList = readSignaturesString2(signFileNameR, signFileNameS);
+            int i = 0;
             while ((line = buffer.readLine()) != null){
                 BigInteger hashline = hashComputing("MD5",line);
                 if(signVerification(currentKeys, hashline, signList.get(i), currentConstants) == false){
