@@ -23,54 +23,15 @@ public class Tools {
         return n;
     }
 
-    //write Signatures from ArrayList in a file
-    //Version 1: object format
-    public static void saveSign(ArrayList<Signature> currentSign, String fileOutName){
-        try(FileOutputStream fileOut = new FileOutputStream(fileOutName);
-            ObjectOutputStream buffer = new ObjectOutputStream(fileOut)) //ce mode de déclaration permet de close() automatiquement
-        {
-            buffer.writeObject(currentSign);
-        }catch (IOException e){
-            e.printStackTrace();
-        }
-    }
-
-    //Version 2: String Format (R1|S1|R2 ... |Sn)
-    public static void saveSign2(ArrayList<Signature> currentSign, String fileOutName){
-
-        WriteService.saveSignatureInFile(currentSign,fileOutName);
-
-    }
-
-    //Version 3: 2 separates files.
-    public static void saveSign3(ArrayList<Signature> currentSign, String fileOutName1, String fileOutName2){
-        try(FileWriter fileOut = new FileWriter(fileOutName1);
-            FileWriter fileOut2 = new FileWriter(fileOutName2);
-            BufferedWriter bufferLineR = new BufferedWriter(fileOut);
-            BufferedWriter bufferLineS = new BufferedWriter(fileOut2)) {
-            String line = null;
-            for(Signature sign:currentSign){
-                line = sign.getR().toString();
-                line = line.concat("-");
-                bufferLineR.write(line);
-                line = sign.getS().toString();
-                line = line.concat("-");
-                bufferLineS.write(line);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
 
     //Key Generation (see B1 page 47)
-    //TODO fct qui vérifie si le couple (L,N) est un couple du standard cf. section 4.2
-    //TODO gestion des erreurs
+    //TODO error handling
     public static Keys keysGen(BigInteger p, BigInteger q, BigInteger g) {
         Keys K = new Keys();
         int L = p.bitLength();
         int N = q.bitLength();
         //check validity du couple (L,N)
-        BigInteger c = Tools.bigRandGen(N + 64); //on compte en bit, c ne doit pas etre negatif
+        BigInteger c = Tools.bigRandGen(N + 64); //unit: bits
         K.setPrivkey((c.mod(q.add(BigInteger.valueOf(-1)))).add(BigInteger.valueOf(1)));
         K.setPubkey(g.modPow(K.getPrivkey(), p));
         return K;
@@ -96,7 +57,7 @@ public class Tools {
         int L = p.bitLength();
         int N = q.bitLength();
 
-        BigInteger c = Tools.bigRandGen(N + 64); //on compte en bit
+        BigInteger c = Tools.bigRandGen(N + 64); //unit: bits
         currentSecret.setSecretNum((c.mod(q.add(BigInteger.valueOf(-1)))).add(BigInteger.valueOf(1)));
         currentSecret.setInvSecret((currentSecret.getSecretNum()).modInverse(q));
         return currentSecret;
@@ -111,9 +72,8 @@ public class Tools {
         try (FileReader reader = new FileReader(sourcename);
              BufferedReader buffer = new BufferedReader(reader)){
             String line;
-            while ((line = buffer.readLine()) != null){
 
-                //BigInteger hashline = hashComputing("sha-1",line);
+            while ((line = buffer.readLine()) != null){
                 BigInteger hashline = hashComputing("MD5",line);
                 SecretNumber currentSecretNum = secretNumGen(currentConstants.getP(),currentConstants.getQ());
                 signatureList.add(dsaSignature(hashline,currentKeys,currentConstants,currentSecretNum));
@@ -140,7 +100,7 @@ public class Tools {
             e.printStackTrace();
         }
         BigInteger hash = new BigInteger(digest);
-        if(hash.compareTo(BigInteger.valueOf(0)) == -1){ //is it requisite ?
+        if(hash.compareTo(BigInteger.valueOf(0)) == -1){
             hash = hash.negate();
         }
         return hash;
@@ -151,7 +111,6 @@ public class Tools {
     //out: Signature
     public static Signature dsaSignature(BigInteger currentHash, Keys currentKeys, Constants currentConstants, SecretNumber currentSecret){
         Signature currentSignature = new Signature();
-        //System.out.println(currentConstants.getG().modPow(currentSecret.getsecretNum(), currentConstants.getP()).mod(currentConstants.getQ()));
         if(currentSecret.getSecretNum() != null && currentConstants.getP() != null && currentConstants.getQ() != null){
             currentSignature.setR((currentConstants.getG().modPow(currentSecret.getSecretNum(), currentConstants.getP())).mod(currentConstants.getQ()));
         }
@@ -161,10 +120,10 @@ public class Tools {
         }
 
         int M = currentHash.bitLength();
-        int N = currentConstants.getQ().bitLength(); // il n'y a pas besoin de currentConstantsidérer le min comme dans la doc (?)
+        int N = currentConstants.getQ().bitLength();
 
         BigInteger z;
-        z = currentHash.shiftRight(Math.max(0,M-N)); //FIXME: s'assure que c'est equivalent a prendre les min(M,N) bits les plus a gauche
+        z = currentHash.shiftRight(Math.max(0,M-N));
         currentSignature.setS(((currentSecret.getInvSecret()).multiply(z.add(currentKeys.getPrivkey().multiply(currentSignature.getR())))).mod(currentConstants.getQ()));
         return currentSignature;
     }
@@ -194,31 +153,6 @@ public class Tools {
         return signList;
     }
 
-    //Version 3: Signatures from 2 files
-    public static ArrayList<Signature> readSignaturesString2(String fileNameR, String fileNameS){
-        ArrayList<Signature> signList = new ArrayList<Signature>();
-        try(FileReader fileR = new FileReader(fileNameR);
-            BufferedReader lineR = new BufferedReader(fileR);
-            FileReader fileS = new FileReader(fileNameS);
-            BufferedReader lineS = new BufferedReader(fileS)) {
-            String strR = lineR.readLine();
-            String strS = lineS.readLine();
-            String splitR[] = strR.split("-");
-            String splitS[] = strS.split("-");
-            int N = splitR.length;
-            for(int i = 0; i<N; i++){
-                Signature sign = new Signature();
-                sign.setR(new BigInteger(splitR[i]));
-                sign.setS(new BigInteger(splitS[i]));
-                signList.add(sign);
-            }
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return signList;
-    }
 
     //signature verification
     public static boolean signVerification(Keys currentKeys, BigInteger hash, Signature sign2Check, Constants currentConstants){
@@ -267,26 +201,6 @@ public class Tools {
             }
             else{
                 System.out.println("All messages are well-signed!");
-            }
-        }catch (IOException e){
-            e.printStackTrace();
-        }
-    }
-
-    //signatures from 2 files
-    public static void signsFromTwoFilesVerification(String signFileNameR, String signFileNameS, String messageFileName, Keys currentKeys, Constants currentConstants) throws SignatureException {
-        try(FileReader receiveMessages = new FileReader(messageFileName);
-            BufferedReader buffer = new BufferedReader(receiveMessages)){
-            String line;
-            ArrayList<Signature> signList = readSignaturesString2(signFileNameR, signFileNameS);
-            int i = 0;
-            while ((line = buffer.readLine()) != null){
-                BigInteger hashline = hashComputing("MD5",line);
-                if(signVerification(currentKeys, hashline, signList.get(i), currentConstants) == false){
-                    System.out.println("Wrong Signature");
-                    throw new SignatureException("One of the signature is wrong"); //How print an exeption ?
-                }
-                i++;
             }
         }catch (IOException e){
             e.printStackTrace();

@@ -26,10 +26,7 @@ public class Signature implements Serializable {
 		this.s = s;
 	}
 
-
-	//faut il les initialiser maintenant ou seuelement dans un currentConstantstructeur ? comme on veut ?
 	public Signature(){
-
 	}
 
 }

@@ -17,3 +17,6 @@ All the messages we want to sign are in the same file, with one different messag
 
 `test number` compute `number` signatures and return the computing time.
 
+For example, the time to compute 10.000 signatures is:
+- about 1.7 secondes with an Intel i5 8200U, 8GB RAM on ubuntu 18.04LTS
+- about 57.3 secondes with a raspberry Pi 3b+ on raspbianOS

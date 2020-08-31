@@ -22,9 +22,9 @@ public class Parser {
             int n = Integer.parseInt(Args[1]); //comment faire dans le cas où l'argument n'est pas convertible en un entier ??
             Constants currentConstant = new Constants();
             Keys currentKeys = keysGen(currentConstant.getP(),currentConstant.getQ(),currentConstant.getG());
-            String message = "bonjour, ca va ?";
+            String message = "This is a short message to sign !";
             long N = manySignatures(n,message,currentKeys,currentConstant);
-            System.out.println("Le temps de calcul de "+n+" signatures est de "+N+" nanosecondes.");
+            System.out.println("The computing time of "+n+" signatures is about "+N+" nanosecondes.");
         }
 
         //verification mode

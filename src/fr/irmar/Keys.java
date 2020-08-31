@@ -8,7 +8,6 @@ import java.math.BigInteger;
 public class Keys {
     private BigInteger privkey;
     private BigInteger pubkey;
-    //private BigInteger tmpkey;
 
     public BigInteger getPrivkey() {
         return privkey;
@@ -26,9 +25,6 @@ public class Keys {
         this.pubkey = pubkey;
     }
 
-
-    //TODO constructor ? la j'ai une méthode dans Tools mais j'sais meme pas quoi en faire ..
     public Keys() {
-
     }
 }
